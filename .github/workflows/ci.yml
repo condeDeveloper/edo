@@ -1,0 +1,60 @@
+name: testes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  testes:
+    runs-on: ${{ matrix.so }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        so: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # Metodo de equacao diferencial erra de um jeito traicoeiro: a saida e uma
+      # curva plausivel mesmo quando esta errada, e uma curva plausivel que
+      # diverge devagar nao parece errada em nada. Por isso todo problema aqui
+      # vem com a solucao EXATA junto, e ela e o juiz.
+      #
+      # Com ela, "qual e a ordem deste metodo?" vira medida: dividir o passo
+      # pela metade e olhar por quanto o erro caiu. Os cinco metodos entregam a
+      # ordem que prometem ate a segunda casa, e nenhum numero deste
+      # repositorio vem de relogio.
+      - name: testes
+        run: dotnet test testes/Edo.Testes/Edo.Testes.csproj -c Release --nologo -v q
+
+      - name: a ordem de cada metodo, medida
+        run: dotnet run --project ferramentas/Medidor/Medidor.csproj -c Release -- ordem
+
+      - name: quantas avaliacoes para o mesmo erro
+        run: dotnet run --project ferramentas/Medidor/Medidor.csproj -c Release -- custo
+
+      - name: rigidez, quando o passo e ditado pela estabilidade
+        run: dotnet run --project ferramentas/Medidor/Medidor.csproj -c Release -- rigidez
+
+      # O achado do repositorio esta aqui: o Euler simpletico e o PIOR dos tres
+      # no erro de posicao em tempo curto, e o unico que mantem a energia
+      # limitada para sempre. A diferenca para o explicito e uma linha de lugar.
+      - name: a energia do oscilador
+        run: dotnet run --project ferramentas/Medidor/Medidor.csproj -c Release -- energia
+
+      - name: a energia conforme o tempo passa
+        run: dotnet run --project ferramentas/Medidor/Medidor.csproj -c Release -- longo
+
+      # O passo adaptativo PERDE no pico largo e ganha na agulha, com o mesmo
+      # codigo: estimar o erro por duplicacao custa tres passos onde um
+      # bastaria. E com tolerancia frouxa ele pula a agulha inteira e reporta
+      # sucesso, porque controle de passo e local e nenhum controle local sabe
+      # o que existe entre dois pontos que ele nunca avaliou.
+      - name: o passo adaptativo contra o passo fixo
+        run: dotnet run --project ferramentas/Medidor/Medidor.csproj -c Release -- adaptativo
